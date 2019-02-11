@@ -13,6 +13,54 @@ end
 
 local scr_x, scr_y
 
+local colors = {
+	white = 1,
+	orange = 2,
+	magenta = 4,
+	lightBlue = 8,
+	yellow = 16,
+	lime = 32,
+	pink = 64,
+	gray = 128,
+	lightGray = 256,
+	cyan = 512,
+	purple = 1024,
+	blue = 2048,
+	brown = 4096,
+	green = 8192,
+	red = 16384,
+	black = 32768
+}
+
+local colorsToRGB = {
+	[1] 	= {240, 240, 240},
+	[2] 	= {242, 178,  51},
+	[4] 	= {229, 127, 216},
+	[8] 	= {153, 178, 242},
+	[16] 	= {222, 222, 108},
+	[32] 	= {127, 204,  25},
+	[64] 	= {242, 178, 204},
+	[128] 	= { 76,  76,  76},
+	[256] 	= {153, 153, 153},
+	[512] 	= { 76, 153, 178},
+	[1024] 	= {178, 102, 229},
+	[2048] 	= { 51, 102, 204},
+	[4096] 	= {127, 102,  76},
+	[8192] 	= { 87, 166,  78},
+	[16384] = {204,  76,  76},
+	[32768] = { 25,  25,  25}
+}
+local RGBtoColors = {}
+local tColors = {}
+
+for k,v in pairs(colors) do
+	tColors[k] = colorsToRGB[v]
+end
+
+for k,v in pairs(colorsToRGB) do
+	RGBtoColors[v] = k
+end
+
 local function capture(cmd, raw)
 	local f = assert(io.popen(cmd, 'r'))
 	local s = assert(f:read('*a'))
@@ -46,7 +94,7 @@ lddterm.newWindow = function(width, height, x, y)
 		width = width,
 		height = height,
 		cursor = {1, 1},
-		colors = {9, 9},
+		colors = {tColors.white, tColors.black},
 		clearChar = " ",
 		x = x or 1,
 		y = y or 1,
@@ -102,27 +150,97 @@ lddterm.newWindow = function(width, height, x, y)
 			lddterm.render()
 		end
 	end
+	window.handle.scrollX = function(amount)
+		if amount > 0 then
+			for i = 1, amount do
+				for c = 1, 3 do
+					for y = 1, window.height do
+						table.remove(window.buffer[c][y], 1)
+						window.buffer[c][y][window.width] = (
+							c == 1 and window.clearChar or
+							c == 2 and window.colors[1] or
+							c == 3 and window.colors[2]
+						)
+					end
+				end
+			end
+		elseif amount < 0 then
+			for i = 1, -amount do
+				for c = 1, 3 do
+					for y = 1, window.height do
+						window.buffer[c][y][window.width] = nil
+						table.insert(window.buffer[c][y], 1, (
+							c == 1 and window.clearChar or
+							c == 2 and window.colors[1] or
+							c == 3 and window.colors[2]
+						))
+					end
+				end
+			end
+		end
+		if lddterm.alwaysRender then
+			lddterm.render()
+		end
+	end
 	window.handle.write = function(text, x, y, ignoreAlwaysRender)
-		text = text and tostring(text)
-		local cx, cy = math.floor(x or window.cursor[1]), math.floor(y or window.cursor[2])
-		if cx > window.width or cy > window.height then
-			return
-		else
-			text = text:sub(math.max(0, -cx - 1))
-			for i = 1, #text do
+		if type(text) == "number" then
+			text = tostring(text)
+		end
+		assert(text, "expected string 'text'")
+		local cx = math.floor(tonumber(x) or window.cursor[1])
+		local cy = math.floor(tonumber(y) or window.cursor[2])
+		text = text:sub(math.max(0, -cx - 1))
+		for i = 1, #text do
+			if cx >= 1 and cx <= window.width and cy >= 1 and cy <= window.height then
 				window.buffer[1][cy][cx] = text:sub(i,i)
 				window.buffer[2][cy][cx] = window.colors[1]
 				window.buffer[3][cy][cx] = window.colors[2]
-				if cx >= window.width then
-					cx = 1
-					if cy >= window.height then
-						window.handle.scroll(1)
-					else
-						cy = cy + 1
-					end
+			end
+			if cx >= window.width or cy < 1 then
+				cx = 1
+				if cy >= window.height then
+					window.handle.scroll(1)
 				else
-					cx = cx + 1
+					cy = cy + 1
 				end
+			else
+				cx = cx + 1
+			end
+		end
+		window.cursor = {cx, cy}
+		if lddterm.alwaysRender and not ignoreAlwaysRender then
+			lddterm.render()
+		end
+	end
+	window.handle.blit = function(char, textCol, backCol, x, y)
+		if type(char) == "number" then
+			char = tostring(char)
+		end
+		if type(textCol) == "number" then
+			textCol = tostring(textCol)
+		end
+		if type(backCol) == "number" then
+			backCol = tostring(backCol)
+		end
+		assert(text, "expected string 'text'")
+		local cx = math.floor(tonumber(x) or window.cursor[1])
+		local cy = math.floor(tonumber(y) or window.cursor[2])
+		text = text:sub(math.max(0, -cx - 1))
+		for i = 1, #text do
+			if cx >= 1 and cx <= window.width and cy >= 1 and cy <= window.height then
+				window.buffer[1][cy][cx] = char:sub(i,i)
+				window.buffer[2][cy][cx] = textCol:sub(i,i)
+				window.buffer[3][cy][cx] = backCol:sub(i,i)
+			end
+			if cx >= window.width or cy < 1 then
+				cx = 1
+				if cy >= window.height then
+					window.handle.scroll(1)
+				else
+					cy = cy + 1
+				end
+			else
+				cx = cx + 1
 			end
 		end
 		window.cursor = {cx, cy}
@@ -190,21 +308,46 @@ lddterm.newWindow = function(width, height, x, y)
 		return window.width, window.height
 	end
 	window.handle.setTextColor = function(color)
-		if color >= 0 and color <= 9 then
-			window.colors[1] = color
+		if colorsToRGB[color] then
+			window.colors[1] = colorsToRGB[color]
 		end
+	end
+	window.handle.setTextColorRGB = function(red, green, blue)
+		window.colors[1] = {math.floor(red), math.floor(green), math.floor(blue)}
 	end
 	window.handle.setBackgroundColor = function(color)
-		if color >= 0 and color <= 9 then
-			window.colors[2] = color
+		if colorsToRGB[color] then
+			window.colors[2] = colorsToRGB[color]
 		end
 	end
+	window.handle.setBackgroundColorRGB = function(red, green, blue)
+		window.colors[2] = {math.floor(red), math.floor(green), math.floor(blue)}
+	end
 	window.handle.getTextColor = function()
-		return window.colors[1]
+		return RGBtoColors[window.colors[1]] or colors.white
 	end
 	window.handle.getBackgroundColor = function()
-		return window.colors[2]
+		return RGBtoColors[window.colors[2]] or colors.black
 	end
+
+	window.ccapi = {
+		colors = colors,
+		paintutils = {
+			loadImage = function( sPath )
+				if type( sPath ) ~= "string" then
+					error( "bad argument #1 (expected string, got " .. type( sPath ) .. ")", 2 )
+				end
+
+				if fs.exists( sPath ) then
+					local file = io.open( sPath, "r" )
+					local sContent = file:read("*a")
+					file:close()
+					return parseImage( sContent ) -- delegate image parse to parseImage
+				end
+				return nil
+			end
+		}
+	}
 
 	window.layer = #lddterm.windows + 1
 	lddterm.windows[window.layer] = window
@@ -226,19 +369,6 @@ lddterm.layerAlter = function(window, layerMod)
 	end
 end
 
-local colors = {
-	black 		= "$(tput setaf 0)",
-	red 		= "$(tput setaf 1)",
-	green 		= "$(tput setaf 2)",
-	yellow 		= "$(tput setaf 3)",
-	lime 		= "$(tput setaf 190)",
-	lightBlue 	= "$(tput setaf 153)",
-	blue 		= "$(tput setaf 4)",
-	magenta 	= "$(tput setaf 5)",
-	cyan 		= "$(tput setaf 6)",
-	white 		= "$(tput setaf 7)"
-}
-
 lddterm.render = function()
 	local sx, sy
 	local c, t, b
@@ -252,7 +382,7 @@ lddterm.render = function()
 
 			c = " "
 			lt, lb = t, b
-			t, b = 9, 0
+			t, b = tColors.white, tColors.black
 			for l = 1, #lddterm.windows do
 				sx = x - lddterm.windows[l].x + 1
 				sy = y - lddterm.windows[l].y + 1
@@ -267,17 +397,17 @@ lddterm.render = function()
 			end
 			if lddterm.useColors then
 				if lt ~= t then
-					line = line .. "$(tput setaf " .. t .. ")"
+					line = line .. '\x1b[38;2;'..table.concat(t, ";")..'m'
 				end
 				if lb ~= b then
-					line = line .. "$(tput setab " .. b .. ")"
+					line = line .. '\x1b[48;2;'..table.concat(b, ";")..'m'
 				end
 			end
 
-			line = line .. c
+			line = line .. c:gsub("'", "’"):gsub("\"", "”")
 
 		end
-		os.execute("echo \"" .. line:gsub("\"", "”") .. "\"")
+		os.execute("printf \"" .. line .. "\\n\"")
 	end
 end
 
