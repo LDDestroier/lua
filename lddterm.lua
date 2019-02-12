@@ -313,7 +313,16 @@ lddterm.newWindow = function(width, height, x, y)
 		end
 	end
 	window.handle.setTextColorRGB = function(red, green, blue)
-		window.colors[1] = {math.floor(red), math.floor(green), math.floor(blue)}
+		if not green then
+			local col = (("%x"):format(red) .. "000000"):sub(1,6)
+			window.colors[1] = {
+				tonumber("0x"..col:sub(1,2)),
+				tonumber("0x"..col:sub(3,4)),
+				tonumber("0x"..col:sub(5,6))
+			}
+		else
+			window.colors[1] = {math.floor(red), math.floor(green), math.floor(blue)}
+		end
 	end
 	window.handle.setBackgroundColor = function(color)
 		if colorsToRGB[color] then
@@ -321,7 +330,16 @@ lddterm.newWindow = function(width, height, x, y)
 		end
 	end
 	window.handle.setBackgroundColorRGB = function(red, green, blue)
-		window.colors[2] = {math.floor(red), math.floor(green), math.floor(blue)}
+		if not green then
+			local col = (("%x"):format(red) .. "000000"):sub(1,6)
+			window.colors[2] = {
+				tonumber("0x"..col:sub(1,2)),
+				tonumber("0x"..col:sub(3,4)),
+				tonumber("0x"..col:sub(5,6))
+			}
+		else
+			window.colors[2] = {math.floor(red), math.floor(green), math.floor(blue)}
+		end
 	end
 	window.handle.getTextColor = function()
 		return RGBtoColors[window.colors[1]] or colors.white
@@ -369,12 +387,18 @@ lddterm.layerAlter = function(window, layerMod)
 	end
 end
 
+local old_scr_x, old_scr_y
+
 lddterm.render = function()
 	local sx, sy
 	local c, t, b
 	local lt, lb
+	old_scr_x, old_scr_y = scr_x, scr_y
 	determineScreenSize()
-	lddterm.clear()
+	if old_scr_x ~= scr_x or old_scr_y ~= scr_y then
+		lddterm.clear()
+	end
+	os.execute("tput cup 0 0")
 	local line
 	for y = 1, scr_y do
 		line = ""
