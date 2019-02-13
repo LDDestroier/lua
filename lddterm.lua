@@ -1,8 +1,8 @@
 local lddterm = {}
+local scr_x, scr_y
 
 lddterm.alwaysRender = false	-- renders after any and all screen-changing functions.
 lddterm.useColors = true		-- use "tput" for colors. looks swood, but decreases performance
-
 lddterm.windows = {}
 
 local isUnix = package.config:sub(1,1) == "/"
@@ -15,8 +15,6 @@ end
 if _VERSION == "Lua 5.1" then
 	lddterm.useColors = false
 end
-
-local scr_x, scr_y
 
 -- used primarily for computercraft compatibility, for what it's worth
 local colors = {
@@ -96,20 +94,52 @@ local explode = function(div, str, replstr, includeDiv)
 	return arr
 end
 
+-- it befuddles me why this is not in regular lua
 lddterm.sleep = function(n) -- seconds
 	local t0 = os.clock()
 	while os.clock() - t0 <= n do end
 end
 
+-- actually factually clears the screen
 lddterm.clear = function()
 	os.execute("clear")
 end
 
+-- determines the size of the terminal before rendering always
 local determineScreenSize = function()
-	scr_x = capture("tput cols")
-	scr_y = capture("tput lines")
+	scr_x = tonumber(capture("tput cols"))
+	scr_y = tonumber(capture("tput lines"))
+	lddterm.screenWidth = scr_x
+	lddterm.screenHeight = scr_y
 end
 
+determineScreenSize()
+
+-- takes two or more windows and checks if the first of them overlap the other(s)
+lddterm.checkWindowOverlap = function(window, ...)
+	if #lddterm.windows < 2 then
+		return false
+	end
+	local list, win = {...}
+	for i = 1, #list do
+		win = list[i]
+		if win ~= window then
+
+			if (
+				window.x < win.x + win.width and
+				win.x < window.x + window.width and
+				window.y < win.y + win.height and
+				win.y < window.y + window.height
+			) then
+				return true
+			end
+
+		end
+	end
+	return false
+end
+
+-- paintutils is a set of art functions for loading and drawing images and drawing lines and boxes.
 local makePaintutilsAPI = function(term)
 	local paintutils = {}
 
@@ -453,10 +483,8 @@ lddterm.newWindow = function(width, height, x, y, meta)
 		end
 	end
 	window.handle.write = function(text, x, y, ignoreAlwaysRender)
-		if type(text) == "number" then
-			text = tostring(text)
-		end
-		assert(text, "expected string 'text'")
+		assert(text ~= nil, "expected string 'text'")
+		text = tostring(text)
 		local cx = math.floor(tonumber(x) or window.cursor[1])
 		local cy = math.floor(tonumber(y) or window.cursor[2])
 		text = text:sub(math.max(0, -cx - 1))
@@ -477,7 +505,7 @@ lddterm.newWindow = function(width, height, x, y, meta)
 		local words = explode(" ", text, nil, true)
 		local cx, cy = x or window.cursor[1], y or window.cursor[2]
 		for i = 1, #words do
-			if cx + #words[i] > window.width then
+			if cx + #words[i] > window.width + 1 then
 				cx = 1
 				if cy >= window.height then
 					window.handle.scroll(1)
@@ -503,7 +531,7 @@ lddterm.newWindow = function(width, height, x, y, meta)
 		if type(backCol) == "number" then
 			backCol = tostring(backCol)
 		end
-		assert(text, "expected string 'text'")
+		assert(text ~= nil, "expected string 'text'")
 		local cx = math.floor(tonumber(x) or window.cursor[1])
 		local cy = math.floor(tonumber(y) or window.cursor[2])
 		text = text:sub(math.max(0, -cx - 1))
@@ -542,7 +570,7 @@ lddterm.newWindow = function(width, height, x, y, meta)
 			end
 		end
 	end
-	window.handle.clear = function(char)
+	window.handle.clear = function(char, ignoreAlwaysRender)
 		local cx = 1
 		for y = 1, window.height do
 			for x = 1, window.width do
@@ -554,11 +582,11 @@ lddterm.newWindow = function(width, height, x, y, meta)
 				window.buffer[3][y][x] = window.colors[2]
 			end
 		end
-		if lddterm.alwaysRender then
+		if lddterm.alwaysRender and not ignoreAlwaysRender then
 			lddterm.render()
 		end
 	end
-	window.handle.clearLine = function(cy, char)
+	window.handle.clearLine = function(cy, char, ignoreAlwaysRender)
 		cy = math.floor(cy)
 		local cx = 1
 		for x = 1, window.width do
@@ -569,11 +597,11 @@ lddterm.newWindow = function(width, height, x, y, meta)
 			window.buffer[2][cy or window.cursor[2]][x] = window.colors[1]
 			window.buffer[3][cy or window.cursor[2]][x] = window.colors[2]
 		end
-		if lddterm.alwaysRender then
+		if lddterm.alwaysRender and not ignoreAlwaysRender then
 			lddterm.render()
 		end
 	end
-	window.handle.clearColumn = function(cx, char)
+	window.handle.clearColumn = function(cx, char, ignoreAlwaysRender)
 		cx = math.floor(cx)
 		char = char and char:sub(1,1)
 		for y = 1, window.height do
@@ -581,7 +609,7 @@ lddterm.newWindow = function(width, height, x, y, meta)
 			window.buffer[2][y][cx or window.cursor[1]] = window.colors[1]
 			window.buffer[3][y][cx or window.cursor[1]] = window.colors[2]
 		end
-		if lddterm.alwaysRender then
+		if lddterm.alwaysRender and not ignoreAlwaysRender then
 			lddterm.render()
 		end
 	end
@@ -644,7 +672,7 @@ lddterm.newWindow = function(width, height, x, y, meta)
 	window.layer = #lddterm.windows + 1
 	lddterm.windows[window.layer] = window
 
-	return window
+	return window, window.layer
 end
 
 lddterm.setLayer = function(window, _layer)
@@ -663,6 +691,7 @@ end
 -- if the screen changes size, the effect is broken
 local old_scr_x, old_scr_y
 
+-- renders the screen in a single printf command
 lddterm.render = function()
 	local sx, sy
 	local c, t, b	-- char, text, back
