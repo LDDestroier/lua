@@ -18,7 +18,7 @@ drawDemo = function(window)
 	term.setTextColor(colors.gray)
 	term.clear(".")
 	term.setTextColor(colors.white)
-	term.write(lddterm.checkWindowOverlap(window, unpack(lddterm.windows)) and "Overlaps." or "Does not overlap.")
+	term.write(lddterm.checkWindowOverlap(window, table.unpack(lddterm.windows)) and "Overlaps." or "Does not overlap.")
 	sleep(0.5)
 
 	for i = 1, 9, 0.1 do
