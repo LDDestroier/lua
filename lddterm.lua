@@ -357,6 +357,13 @@ lddterm.newWindow = function(width, height, x, y, meta)
 	window.handle.getBackgroundColor = function()
 		return RGBtoColors[window.colors[2]] or colors.black
 	end
+	window.handle.moveWindow = function(x, y)
+		window.x = math.floor(x or window.x)
+		window.y = math.floor(y or window.y)
+		if lddterm.alwaysRender then
+			lddterm.render()
+		end
+	end
 
 	window.ccapi = {
 		colors = colors,
@@ -383,17 +390,13 @@ lddterm.newWindow = function(width, height, x, y, meta)
 	return window
 end
 
-lddterm.layerAlter = function(window, _layerMod)
-	local layerMod = math.max(math.min(_layerMod, #lddterm.windows + 1), #lddterm.windows - window.layer - 1)
+lddterm.setLayer = function(window, _layer)
+	local layer = math.max(1, math.min(#lddterm.windows, _layer))
 
-	local you = lddterm.windows[window.layer]
-	local nou = lddterm.windows[window.layer + layerMod]
-	if you and not ((not nou) and (layerMod < 0)) then
-		lddterm.windows[window.layer], lddterm.windows[window.layer + layerMod] = nou, you
-		lddterm.windows[window.layer].layer, lddterm.windows[window.layer + layerMod].layer = you.layer, nou.layer
-	else
-		return false
-	end
+	local win = window
+	table.remove(lddterm.windows, win.layer)
+	table.insert(lddterm.windows, layer, win)
+
 	if lddterm.alwaysRender then
 		lddterm.render()
 	end
