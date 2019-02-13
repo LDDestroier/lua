@@ -82,6 +82,20 @@ local function capture(cmd, raw)
 	end
 end
 
+-- separates string into table based on divider
+local explode = function(div, str, replstr, includeDiv)
+	if (div == '') then
+		return false
+	end
+	local pos, arr = 0, {}
+	for st, sp in function() return string.find(str, div, pos, false) end do
+		table.insert(arr, string.sub(replstr or str, pos, st - 1 + (includeDiv and #div or 0)))
+		pos = sp + 1
+	end
+	table.insert(arr, string.sub(replstr or str, pos))
+	return arr
+end
+
 lddterm.sleep = function(n) -- seconds
 	local t0 = os.clock()
 	while os.clock() - t0 <= n do end
@@ -153,192 +167,190 @@ local makePaintutilsAPI = function(term)
 	end
 
 	function paintutils.drawLine( startX, startY, endX, endY, nColour )
-	if type( startX ) ~= "number" then error( "bad argument #1 (expected number, got " .. type( startX ) .. ")", 2 ) end
-	if type( startY ) ~= "number" then error( "bad argument #2 (expected number, got " .. type( startY ) .. ")", 2 ) end
-	if type( endX ) ~= "number" then error( "bad argument #3 (expected number, got " .. type( endX ) .. ")", 2 ) end
-	if type( endY ) ~= "number" then error( "bad argument #4 (expected number, got " .. type( endY ) .. ")", 2 ) end
-	if nColour ~= nil and type( nColour ) ~= "number" then error( "bad argument #5 (expected number, got " .. type( nColour ) .. ")", 2 ) end
+		if type( startX ) ~= "number" then error( "bad argument #1 (expected number, got " .. type( startX ) .. ")", 2 ) end
+		if type( startY ) ~= "number" then error( "bad argument #2 (expected number, got " .. type( startY ) .. ")", 2 ) end
+		if type( endX ) ~= "number" then error( "bad argument #3 (expected number, got " .. type( endX ) .. ")", 2 ) end
+		if type( endY ) ~= "number" then error( "bad argument #4 (expected number, got " .. type( endY ) .. ")", 2 ) end
+		if nColour ~= nil and type( nColour ) ~= "number" then error( "bad argument #5 (expected number, got " .. type( nColour ) .. ")", 2 ) end
 
-	local alwaysRender = lddterm.alwaysRender
-	lddterm.alwaysRender = false
+		local alwaysRender = lddterm.alwaysRender
+		lddterm.alwaysRender = false
 
-	startX = math.floor(startX)
-	startY = math.floor(startY)
-	endX = math.floor(endX)
-	endY = math.floor(endY)
+		startX = math.floor(startX)
+		startY = math.floor(startY)
+		endX = math.floor(endX)
+		endY = math.floor(endY)
 
-	if nColour then
-	term.setBackgroundColor( nColour )
-	end
-	if startX == endX and startY == endY then
-	drawPixelInternal( startX, startY )
-	return
-	end
+		if nColour then
+			term.setBackgroundColor( nColour )
+		end
+		if startX == endX and startY == endY then
+			drawPixelInternal( startX, startY )
+			if alwaysRender then lddterm.render() end
+			lddterm.alwaysRender = alwaysRender
+			return
+		end
 
-	local minX = math.min( startX, endX )
-	local maxX, minY, maxY
-	if minX == startX then
-	minY = startY
-	maxX = endX
-	maxY = endY
-	else
-	minY = endY
-	maxX = startX
-	maxY = startY
-	end
+		local minX = math.min( startX, endX )
+		local maxX, minY, maxY
+		if minX == startX then
+			minY = startY
+			maxX = endX
+			maxY = endY
+		else
+			minY = endY
+			maxX = startX
+			maxY = startY
+		end
 
-	-- TODO: clip to screen rectangle?
+		local xDiff = maxX - minX
+		local yDiff = maxY - minY
 
-	local xDiff = maxX - minX
-	local yDiff = maxY - minY
-
-	if xDiff > math.abs(yDiff) then
-	local y = minY
-	local dy = yDiff / xDiff
-	for x=minX,maxX do
-	drawPixelInternal( x, math.floor( y + 0.5 ) )
-	y = y + dy
-	end
-	else
-	local x = minX
-	local dx = xDiff / yDiff
-	if maxY >= minY then
-	for y=minY,maxY do
-	drawPixelInternal( math.floor( x + 0.5 ), y )
-	x = x + dx
-	end
-	else
-	for y=minY,maxY,-1 do
-	drawPixelInternal( math.floor( x + 0.5 ), y )
-	x = x - dx
-	end
-	end
-	end
-	if alwaysRender then
-	lddterm.render()
-	end
-	term.alwaysRender = alwaysRender
+		if xDiff > math.abs(yDiff) then
+			local y = minY
+			local dy = yDiff / xDiff
+			for x=minX,maxX do
+				drawPixelInternal( x, math.floor( y + 0.5 ) )
+				y = y + dy
+			end
+		else
+			local x = minX
+			local dx = xDiff / yDiff
+			if maxY >= minY then
+				for y=minY,maxY do
+					drawPixelInternal( math.floor( x + 0.5 ), y )
+					x = x + dx
+				end
+			else
+				for y=minY,maxY,-1 do
+					drawPixelInternal( math.floor( x + 0.5 ), y )
+					x = x - dx
+				end
+			end
+		end
+		if alwaysRender then lddterm.render() end
+		lddterm.alwaysRender = alwaysRender
 	end
 
 	function paintutils.drawBox( startX, startY, endX, endY, nColour )
-	if type( startX ) ~= "number" then error( "bad argument #1 (expected number, got " .. type( startX ) .. ")", 2 ) end
-	if type( startY ) ~= "number" then error( "bad argument #2 (expected number, got " .. type( startY ) .. ")", 2 ) end
-	if type( endX ) ~= "number" then error( "bad argument #3 (expected number, got " .. type( endX ) .. ")", 2 ) end
-	if type( endY ) ~= "number" then error( "bad argument #4 (expected number, got " .. type( endY ) .. ")", 2 ) end
-	if nColour ~= nil and type( nColour ) ~= "number" then error( "bad argument #5 (expected number, got " .. type( nColour ) .. ")", 2 ) end
+		if type( startX ) ~= "number" then error( "bad argument #1 (expected number, got " .. type( startX ) .. ")", 2 ) end
+		if type( startY ) ~= "number" then error( "bad argument #2 (expected number, got " .. type( startY ) .. ")", 2 ) end
+		if type( endX ) ~= "number" then error( "bad argument #3 (expected number, got " .. type( endX ) .. ")", 2 ) end
+		if type( endY ) ~= "number" then error( "bad argument #4 (expected number, got " .. type( endY ) .. ")", 2 ) end
+		if nColour ~= nil and type( nColour ) ~= "number" then error( "bad argument #5 (expected number, got " .. type( nColour ) .. ")", 2 ) end
 
-	local alwaysRender = lddterm.alwaysRender
-	lddterm.alwaysRender = false
+		local alwaysRender = lddterm.alwaysRender
+		lddterm.alwaysRender = false
 
-	startX = math.floor(startX)
-	startY = math.floor(startY)
-	endX = math.floor(endX)
-	endY = math.floor(endY)
+		startX = math.floor(startX)
+		startY = math.floor(startY)
+		endX = math.floor(endX)
+		endY = math.floor(endY)
 
-	if nColour then
-	term.setBackgroundColor( nColour )
-	end
-	if startX == endX and startY == endY then
-	drawPixelInternal( startX, startY )
-	return
-	end
+		if nColour then
+			term.setBackgroundColor( nColour )
+		end
+		if startX == endX and startY == endY then
+			drawPixelInternal( startX, startY )
+			if alwaysRender then lddterm.render() end
+			lddterm.alwaysRender = alwaysRender
+			return
+		end
 
-	local minX = math.min( startX, endX )
-	local maxX, minY, maxY
-	if minX == startX then
-	minY = startY
-	maxX = endX
-	maxY = endY
-	else
-	minY = endY
-	maxX = startX
-	maxY = startY
-	end
+		local minX = math.min( startX, endX )
+		local maxX, minY, maxY
+		if minX == startX then
+			minY = startY
+			maxX = endX
+			maxY = endY
+		else
+			minY = endY
+			maxX = startX
+			maxY = startY
+		end
 
-	for x=minX,maxX do
-	drawPixelInternal( x, minY )
-	drawPixelInternal( x, maxY )
-	end
+		for x=minX,maxX do
+			drawPixelInternal( x, minY )
+			drawPixelInternal( x, maxY )
+		end
 
-	if (maxY - minY) >= 2 then
-	for y=(minY+1),(maxY-1) do
-	drawPixelInternal( minX, y )
-	drawPixelInternal( maxX, y )
-	end
-	end
-	if alwaysRender then
-	lddterm.render()
-	end
-	lddterm.alwaysRender = alwaysRender
+		if (maxY - minY) >= 2 then
+			for y=(minY+1),(maxY-1) do
+				drawPixelInternal( minX, y )
+				drawPixelInternal( maxX, y )
+			end
+		end
+		if alwaysRender then lddterm.render() end
+		lddterm.alwaysRender = alwaysRender
 	end
 
 	function paintutils.drawFilledBox( startX, startY, endX, endY, nColour )
-	if type( startX ) ~= "number" then error( "bad argument #1 (expected number, got " .. type( startX ) .. ")", 2 ) end
-	if type( startY ) ~= "number" then error( "bad argument #2 (expected number, got " .. type( startY ) .. ")", 2 ) end
-	if type( endX ) ~= "number" then error( "bad argument #3 (expected number, got " .. type( endX ) .. ")", 2 ) end
-	if type( endY ) ~= "number" then error( "bad argument #4 (expected number, got " .. type( endY ) .. ")", 2 ) end
-	if nColour ~= nil and type( nColour ) ~= "number" then error( "bad argument #5 (expected number, got " .. type( nColour ) .. ")", 2 ) end
+		if type( startX ) ~= "number" then error( "bad argument #1 (expected number, got " .. type( startX ) .. ")", 2 ) end
+		if type( startY ) ~= "number" then error( "bad argument #2 (expected number, got " .. type( startY ) .. ")", 2 ) end
+		if type( endX ) ~= "number" then error( "bad argument #3 (expected number, got " .. type( endX ) .. ")", 2 ) end
+		if type( endY ) ~= "number" then error( "bad argument #4 (expected number, got " .. type( endY ) .. ")", 2 ) end
+		if nColour ~= nil and type( nColour ) ~= "number" then error( "bad argument #5 (expected number, got " .. type( nColour ) .. ")", 2 ) end
 
-	local alwaysRender = lddterm.alwaysRender
-	lddterm.alwaysRender = false
+		local alwaysRender = lddterm.alwaysRender
+		lddterm.alwaysRender = false
 
-	startX = math.floor(startX)
-	startY = math.floor(startY)
-	endX = math.floor(endX)
-	endY = math.floor(endY)
+		startX = math.floor(startX)
+		startY = math.floor(startY)
+		endX = math.floor(endX)
+		endY = math.floor(endY)
 
-	if nColour then
-	term.setBackgroundColor( nColour )
-	end
-	if startX == endX and startY == endY then
-	drawPixelInternal( startX, startY )
-	return
-	end
+		if nColour then
+			term.setBackgroundColor( nColour )
+		end
+		if startX == endX and startY == endY then
+			drawPixelInternal( startX, startY )
+			return
+		end
 
-	local minX = math.min( startX, endX )
-	local maxX, minY, maxY
-	if minX == startX then
-	minY = startY
-	maxX = endX
-	maxY = endY
-	else
-	minY = endY
-	maxX = startX
-	maxY = startY
-	end
+		local minX = math.min( startX, endX )
+		local maxX, minY, maxY
+		if minX == startX then
+			minY = startY
+			maxX = endX
+			maxY = endY
+		else
+			minY = endY
+			maxX = startX
+			maxY = startY
+		end
 
-	for x=minX,maxX do
-	for y=minY,maxY do
-	drawPixelInternal( x, y )
-	end
-	end
-	if alwaysRender then
-	lddterm.render()
-	end
-	lddterm.alwaysRender = alwaysRender
+		for x=minX,maxX do
+			for y=minY,maxY do
+				drawPixelInternal( x, y )
+			end
+		end
+		if alwaysRender then
+			lddterm.render()
+		end
+		lddterm.alwaysRender = alwaysRender
 	end
 
 	function paintutils.drawImage( tImage, xPos, yPos )
-	if type( tImage ) ~= "table" then error( "bad argument #1 (expected table, got " .. type( tImage ) .. ")", 2 ) end
-	if type( xPos ) ~= "number" then error( "bad argument #2 (expected number, got " .. type( xPos ) .. ")", 2 ) end
-	if type( yPos ) ~= "number" then error( "bad argument #3 (expected number, got " .. type( yPos ) .. ")", 2 ) end
+		if type( tImage ) ~= "table" then error( "bad argument #1 (expected table, got " .. type( tImage ) .. ")", 2 ) end
+		if type( xPos ) ~= "number" then error( "bad argument #2 (expected number, got " .. type( xPos ) .. ")", 2 ) end
+		if type( yPos ) ~= "number" then error( "bad argument #3 (expected number, got " .. type( yPos ) .. ")", 2 ) end
 
-	local alwaysRender = lddterm.alwaysRender
-	lddterm.alwaysRender = false
+		local alwaysRender = lddterm.alwaysRender
+		lddterm.alwaysRender = false
 
-	for y=1,#tImage do
-	local tLine = tImage[y]
-	for x=1,#tLine do
-	if tLine[x] > 0 then
-	term.setBackgroundColor( tLine[x] )
-	drawPixelInternal( x + xPos - 1, y + yPos - 1 )
-	end
-	end
-	end
-	if alwaysRender then
-	lddterm.render()
-	end
-	lddterm.alwaysRender = alwaysRender
+		for y=1,#tImage do
+			local tLine = tImage[y]
+			for x=1,#tLine do
+				if tLine[x] > 0 then
+					term.setBackgroundColor( tLine[x] )
+					drawPixelInternal( x + xPos - 1, y + yPos - 1 )
+				end
+			end
+		end
+		if alwaysRender then
+			lddterm.render()
+		end
+		lddterm.alwaysRender = alwaysRender
 	end
 
 	return paintutils
@@ -454,18 +466,29 @@ lddterm.newWindow = function(width, height, x, y, meta)
 				window.buffer[2][cy][cx] = window.colors[1]
 				window.buffer[3][cy][cx] = window.colors[2]
 			end
-			if cx >= window.width or cy < 1 then
+			cx = math.min(cx + 1, window.width + 1)
+		end
+		window.cursor = {cx, cy}
+		if lddterm.alwaysRender and not ignoreAlwaysRender then
+			lddterm.render()
+		end
+	end
+	window.handle.writeWrap = function(text, x, y, ignoreAlwaysRender)
+		local words = explode(" ", text, nil, true)
+		local cx, cy = x or window.cursor[1], y or window.cursor[2]
+		for i = 1, #words do
+			if cx + #words[i] > window.width then
 				cx = 1
 				if cy >= window.height then
 					window.handle.scroll(1)
+					cy = window.height
 				else
 					cy = cy + 1
 				end
-			else
-				cx = cx + 1
 			end
+			window.handle.write(words[i], cx, cy, true)
+			cx = cx + #words[i]
 		end
-		window.cursor = {cx, cy}
 		if lddterm.alwaysRender and not ignoreAlwaysRender then
 			lddterm.render()
 		end
