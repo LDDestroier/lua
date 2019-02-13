@@ -11,8 +11,14 @@ if not isUnix then
 	error("Linux or Unix is required to use. I'm not sorry.")
 end
 
+-- proper color support is only in Lua 5.2 and higher
+if _VERSION == "Lua 5.1" then
+	lddterm.useColors = false
+end
+
 local scr_x, scr_y
 
+-- used primarily for computercraft compatibility, for what it's worth
 local colors = {
 	white = 1,
 	orange = 2,
@@ -61,6 +67,7 @@ for k,v in pairs(colorsToRGB) do
 	RGBtoColors[v] = k
 end
 
+-- run program and return its output
 local function capture(cmd, raw)
 	local f = assert(io.popen(cmd, 'r'))
 	local s = assert(f:read('*a'))
@@ -86,26 +93,29 @@ end
 
 local determineScreenSize = function()
 	scr_x = capture("tput cols")
-	scr_y = capture("tput lines") - 1
+	scr_y = capture("tput lines")
 end
 
-lddterm.newWindow = function(width, height, x, y)
+lddterm.newWindow = function(width, height, x, y, meta)
+	meta = meta or {}
 	local window = {
 		width = width,
 		height = height,
-		cursor = {1, 1},
-		colors = {tColors.white, tColors.black},
-		clearChar = " ",
+		cursor = meta.cursor or {1, 1},
+		colors = meta.colors or {tColors.white, tColors.black},
+		clearChar = meta.clearChar or " ",
 		x = x or 1,
 		y = y or 1,
 		buffer = {{},{},{}},
 	}
-	for c = 1, 3 do
-		for y = 1, height do
-			window.buffer[c][y] = {}
-			for x = 1, width do
-				window.buffer[c][y][x] = " "
-			end
+	for y = 1, height do
+		window.buffer[1][y] = {}
+		window.buffer[2][y] = {}
+		window.buffer[3][y] = {}
+		for x = 1, width do
+			window.buffer[1][y][x] = window.clearChar
+			window.buffer[2][y][x] = window.colors[1]
+			window.buffer[3][y][x] = window.colors[2]
 		end
 	end
 
@@ -373,35 +383,38 @@ lddterm.newWindow = function(width, height, x, y)
 	return window
 end
 
-lddterm.layerAlter = function(window, layerMod)
+lddterm.layerAlter = function(window, _layerMod)
+	local layerMod = math.max(math.min(_layerMod, #lddterm.windows + 1), #lddterm.windows - window.layer - 1)
+
 	local you = lddterm.windows[window.layer]
 	local nou = lddterm.windows[window.layer + layerMod]
-	if you then
-		you, you.layer, nou, nou.layer = nou, nou.layer, you, you.layer
-		return true
+	if you and not ((not nou) and (layerMod < 0)) then
+		lddterm.windows[window.layer], lddterm.windows[window.layer + layerMod] = nou, you
+		lddterm.windows[window.layer].layer, lddterm.windows[window.layer + layerMod].layer = you.layer, nou.layer
 	else
 		return false
 	end
 	if lddterm.alwaysRender then
 		lddterm.render()
 	end
+	return true
 end
 
+-- if the screen changes size, the effect is broken
 local old_scr_x, old_scr_y
 
 lddterm.render = function()
 	local sx, sy
-	local c, t, b
+	local c, t, b	-- char, text, back
 	local lt, lb
+	-- determine new screen size and change lddterm screen to fit
 	old_scr_x, old_scr_y = scr_x, scr_y
 	determineScreenSize()
 	if old_scr_x ~= scr_x or old_scr_y ~= scr_y then
 		lddterm.clear()
 	end
-	os.execute("tput cup 0 0")
-	local line
+	local line = ""
 	for y = 1, scr_y do
-		line = ""
 		for x = 1, scr_x do
 
 			c = " "
@@ -412,27 +425,33 @@ lddterm.render = function()
 				sy = y - lddterm.windows[l].y + 1
 				if lddterm.windows[l].buffer[1][sy] then
 					if lddterm.windows[l].buffer[1][sy][sx] then
-						c = lddterm.windows[l].buffer[1][sy][sx]
-						t = lddterm.windows[l].buffer[2][sy][sx]
-						b = lddterm.windows[l].buffer[3][sy][sx]
+						c = lddterm.windows[l].buffer[1][sy][sx] or c
+						t = lddterm.windows[l].buffer[2][sy][sx] or t
+						b = lddterm.windows[l].buffer[3][sy][sx] or b
 						break
 					end
 				end
 			end
 			if lddterm.useColors then
 				if lt ~= t then
-					line = line .. '\x1b[38;2;'..table.concat(t, ";")..'m'
+					if type(t) ~= "table" then
+						error("t = '" .. t .. "'")
+					end
+					line = line .. '\x1b[38;2;'..table.concat(t, ";", 1, 3)..'m'
 				end
 				if lb ~= b then
-					line = line .. '\x1b[48;2;'..table.concat(b, ";")..'m'
+					if type(b) ~= "table" then
+						error("b = '" .. b .. "'")
+					end
+					line = line .. '\x1b[48;2;'..table.concat(b, ";", 1, 3)..'m'
 				end
 			end
 
 			line = line .. c:gsub("'", "’"):gsub("\"", "”")
 
 		end
-		os.execute("printf \"" .. line .. "\\n\"")
 	end
+	os.execute("tput cup 0 0; printf \"" .. line .. "\"")
 end
 
 return lddterm
