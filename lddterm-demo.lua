@@ -9,7 +9,7 @@ drawDemo = function(window)
 	lddterm.setLayer(window, 1)
 	local term = window.handle
 	local colors = window.ccapi.colors
-
+	local paintutils = window.ccapi.paintutils
 	local sleep = lddterm.sleep
 
 	local i = 0
@@ -17,27 +17,27 @@ drawDemo = function(window)
 	term.setBackgroundColorRGB(0x262626)
 	term.clear(".")
 
-	sleep(1)
+	paintutils.drawLine(2, 2, 7, 5, colors.red)
 
 	term.setBackgroundColor(colors.blue)
 	term.setTextColor(colors.yellow)
 
-	term.write("Hello!", 9, 5)
+	term.write("Hello!", 9, 4)
 	sleep(0.5)
 
 	term.setBackgroundColor(colors.orange)
 	term.setTextColorRGB(0x0000FF)
 
-	term.write("This is a test of 'LDDTerm'!", 4, 7)
+	term.writeWrap("This is a test of 'LDDTerm'!", 4, 6)
 	sleep(0.8)
 
 	term.setBackgroundColorRGB(255, 0, 0)
 	term.setTextColorRGB(0x000000)
 
-	term.write("It's an API that provides basic \"windows\" that you can write in.", 5, 9)
+	term.writeWrap("It's an API that provides basic \"windows\" that you can write in.", 5, 8)
 	sleep(0.5)
 
-	term.write("similar to the ComputerCraft's own term and window APIs!", 6, 10)
+	term.writeWrap("similar to the ComputerCraft's own term and window APIs!", 6, 10)
 	sleep(1)
 
 	term.setBackgroundColorRGB(0x262626)
@@ -45,44 +45,44 @@ drawDemo = function(window)
 
 	for i = 1, 3 do
 		term.scroll(-1)
---		sleep(0.05)
+		sleep(0.05)
 	end
 
 	for i = 1, 3 do
 		term.scrollX(-1)
---		sleep(0.05)
+		sleep(0.05)
 	end
 
 	for i = 1, 6 do
 		term.scroll(1)
---		sleep(0.05)
+		sleep(0.05)
 	end
 
 	for i = 1, 6 do
 		term.scrollX(1)
---		sleep(0.05)
+		sleep(0.05)
 	end
 
 	for i = 1, 3 do
 		term.scroll(-1)
---		sleep(0.05)
+		sleep(0.05)
 	end
 
 	for i = 1, 3 do
 		term.scrollX(-1)
---		sleep(0.05)
+		sleep(0.05)
 	end
 
 	sleep(1)
 
 	for i = 1, 5 do
 		term.scroll(1)
---		sleep(0.05)
+		sleep(0.05)
 	end
 
-	term.write("Supports 'term.scroll' and 'term.scrollX',", 2, 6)
-	term.write("amongst other things!", 2, 7)
-	term.write("You can also move windows.", 2, 9)
+	term.writeWrap("Supports 'term.scroll' and 'term.scrollX',", 2, 6)
+	term.writeWrap("amongst other things!", 2, 7)
+	term.writeWrap("You can also move windows.", 2, 9)
 
 	sleep(1)
 
@@ -115,7 +115,7 @@ drawDemo = function(window)
 	for i = 1, 100 do
 		term.setTextColorRGB(math.random(0, 0xFFFFFE))
 		term.setBackgroundColorRGB(math.random(0, 0xFFFFFF))
-		term.write((" "):rep(math.random(0, 12)) .. "Fuck you")
+		term.writeWrap((" "):rep(math.random(0, 12)) .. "Fuck you")
 	end
 
 	sleep(1)
