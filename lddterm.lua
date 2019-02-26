@@ -531,11 +531,11 @@ lddterm.newWindow = function(width, height, x, y, meta)
 		if type(backCol) == "number" then
 			backCol = tostring(backCol)
 		end
-		assert(text ~= nil, "expected string 'text'")
+		assert(char ~= nil, "expected string 'char'")
 		local cx = math.floor(tonumber(x) or window.cursor[1])
 		local cy = math.floor(tonumber(y) or window.cursor[2])
-		text = text:sub(math.max(0, -cx - 1))
-		for i = 1, #text do
+		char = char:sub(math.max(0, -cx - 1))
+		for i = 1, #char do
 			if cx >= 1 and cx <= window.width and cy >= 1 and cy <= window.height then
 				window.buffer[1][cy][cx] = char:sub(i,i)
 				window.buffer[2][cy][cx] = textCol:sub(i,i)
@@ -577,7 +577,7 @@ lddterm.newWindow = function(width, height, x, y, meta)
 				if char then
 					cx = (x % #char) + 1
 				end
-				window.buffer[1][y][x] = char:sub(cx, cx) or window.clearChar
+				window.buffer[1][y][x] = char and char:sub(cx, cx) or window.clearChar
 				window.buffer[2][y][x] = window.colors[1]
 				window.buffer[3][y][x] = window.colors[2]
 			end
@@ -593,7 +593,7 @@ lddterm.newWindow = function(width, height, x, y, meta)
 			if char then
 				cx = (x % #char) + 1
 			end
-			window.buffer[1][cy or window.cursor[2]][x] = char:sub(cx, cx) or window.clearChar
+			window.buffer[1][cy or window.cursor[2]][x] = char and char:sub(cx, cx) or window.clearChar
 			window.buffer[2][cy or window.cursor[2]][x] = window.colors[1]
 			window.buffer[3][cy or window.cursor[2]][x] = window.colors[2]
 		end
@@ -605,7 +605,7 @@ lddterm.newWindow = function(width, height, x, y, meta)
 		cx = math.floor(cx)
 		char = char and char:sub(1,1)
 		for y = 1, window.height do
-			window.buffer[1][y][cx or window.cursor[1]] = char or window.clearChar
+			window.buffer[1][y][cx or window.cursor[1]] = char and char or window.clearChar
 			window.buffer[2][y][cx or window.cursor[1]] = window.colors[1]
 			window.buffer[3][y][cx or window.cursor[1]] = window.colors[2]
 		end
@@ -615,6 +615,9 @@ lddterm.newWindow = function(width, height, x, y, meta)
 	end
 	window.handle.getSize = function()
 		return window.width, window.height
+	end
+	window.handle.isColor = function()
+		return lddterm.useColors
 	end
 	window.handle.setTextColor = function(color)
 		if colorsToRGB[color] then
